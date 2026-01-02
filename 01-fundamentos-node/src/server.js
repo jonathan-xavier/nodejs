@@ -1,24 +1,35 @@
 import http from 'node:http'
+import { json } from './middlewares/json.js'
+import { routes } from './routes.js'
+import { extractQueryParams } from './utils/extract-query-params.js'
 
-const users = []
+// UUID = unique universal ID
+//query parameters: URL Statefull => filtros, paginacao, nao-brigatorias
+//route parameters: Identificação de recurso ex: .../user/1
+//request body: envio de informaçôes de um formulário (HTTPS)
 
-const server = http.createServer((req, res) => {
-    const {method, url} = req
-    if (method === "GET" && url === "/users"){
+// http://localhost:3333/users?userId=1
+
+const server = http.createServer(async (req, res) => {
+    const { method, url } = req
+    
+    await json(req, res)
+
+    const route = routes.find(route =>  {
+        return route.method === method && route.path.test(url)
+    })
+    
+    if(route){
+        const routeParams = req.url.match(route.path)
+        req.params = {...routeParams.groups}
+        // console.log(extractQueryParams(routeParams.groups.query));
+        const { query, ...params } = routeParams.groups
+        req.params = params
+        req.query = query ? extractQueryParams(query) : {}
         
-        return res
-        .setHeader('Content-type', 'application/json')
-        .end(JSON.stringify(users))
+        return route.handler(req, res)
     }
 
-    if(method === "POST" && url === "/users"){
-        users.push({
-            id: 1,
-            name: "jhon doe",
-            email: "jhondoe@gmail.com"
-        })
-        return res.writeHead(201).end("Criacao de usuarios")
-    }
     return res.writeHead(404).end()
 })
 
